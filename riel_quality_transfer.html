@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>RIEL Quality Transfer</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07070a;color:#fff;font-family:Arial, sans-serif}
+.wrap{max-width:850px;margin:auto;padding:35px 20px}.logo{font-size:25px;font-weight:900;letter-spacing:3px;margin-bottom:30px}
+.logo span{color:#888}.card{background:#111116;border:1px solid #27272f;border-radius:20px;padding:25px}
+h1{margin:0 0 8px;font-size:30px}p{color:#9999a5;line-height:1.5}
+.drop{margin-top:25px;border:2px dashed #383840;border-radius:16px;padding:50px 20px;text-align:center;cursor:pointer}
+.drop:hover{background:#17171d;border-color:#777}
+.drop b{display:block;font-size:18px;margin-bottom:8px}.drop small{color:#888}
+input{display:none}.file{display:none;margin-top:20px;padding:15px;background:#18181e;border-radius:12px}
+.info{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.pill{background:#202027;padding:8px 11px;border-radius:20px;font-size:12px;color:#bbb}
+video{width:100%;max-height:480px;margin-top:20px;border-radius:12px;background:#000;display:none}
+.actions{display:flex;gap:10px;margin-top:18px}button{border:0;border-radius:11px;padding:13px 17px;font-weight:bold;cursor:pointer}
+.primary{background:#fff;color:#000}.secondary{background:#25252d;color:#fff}
+.note{margin-top:18px;padding:14px;background:#18181e;border-radius:12px;font-size:13px;color:#aaa;line-height:1.5}
+#status{margin-top:12px;color:#aaa;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="logo">RIEL<span> QUALITY</span></div>
+<div class="card">
+<h1>Quality Transfer</h1>
+<p>Move your finished edit from PC to your phone without this website compressing or converting it.</p>
+
+<label class="drop" id="drop" for="file">
+<b>Drop your video here</b>
+<small>or click to select your original MP4/MOV</small>
+</label>
+<input id="file" type="file" accept="video/mp4,video/quicktime,video/*">
+
+<div id="filebox" class="file">
+<strong id="filename"></strong>
+<div class="info">
+<div class="pill" id="size"></div>
+<div class="pill" id="type"></div>
+<div class="pill">Original file • No re-encode</div>
+</div>
+</div>
+
+<video id="preview" controls playsinline></video>
+
+<div class="actions">
+<button class="secondary" id="clear">Clear</button>
+<button class="primary" id="download" disabled>Save original file</button>
+</div>
+
+<div id="status"></div>
+
+<div class="note">
+<b>How this protects quality:</b> the browser reads your selected file locally and the Save button downloads the same file bytes. There is no compression, resizing, FPS conversion, or video re-encoding.
+<br><br>
+For the best TikTok quality, upload the saved original file to TikTok rather than sending it through WhatsApp or another service that compresses videos.
+</div>
+</div>
+</div>
+
+<script>
+let selected=null, url=null;
+const file=document.getElementById('file'), drop=document.getElementById('drop');
+
+function formatSize(n){
+ if(n<1024*1024)return (n/1024).toFixed(1)+' KB';
+ return (n/1024/1024).toFixed(2)+' MB';
+}
+function load(f){
+ if(!f || !f.type.startsWith('video/')){
+  document.getElementById('status').textContent='Please choose a video file.';
+  return;
+ }
+ selected=f;
+ document.getElementById('filename').textContent=f.name;
+ document.getElementById('size').textContent=formatSize(f.size);
+ document.getElementById('type').textContent=f.type||'video';
+ document.getElementById('filebox').style.display='block';
+ document.getElementById('download').disabled=false;
+ if(url)URL.revokeObjectURL(url);
+ url=URL.createObjectURL(f);
+ const v=document.getElementById('preview'); v.src=url; v.style.display='block';
+ document.getElementById('status').textContent='Ready. This site will not compress or convert your file.';
+}
+file.addEventListener('change',e=>load(e.target.files[0]));
+['dragenter','dragover'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor='#aaa'}));
+['dragleave','drop'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor=''}));
+drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+
+document.getElementById('download').onclick=()=>{
+ if(!selected)return;
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(selected);
+ a.download=selected.name;
+ document.body.appendChild(a);a.click();a.remove();
+ document.getElementById('status').textContent='Saved the original file — no conversion was performed.';
+};
+
+document.getElementById('clear').onclick=()=>{
+ selected=null;file.value='';
+ if(url)URL.revokeObjectURL(url);url=null;
+ document.getElementById('filebox').style.display='none';
+ document.getElementById('preview').style.display='none';
+ document.getElementById('preview').removeAttribute('src');
+ document.getElementById('download').disabled=true;
+ document.getElementById('status').textContent='';
+};
+</script>
+</body>
+</html>
