@@ -24,4 +24,4 @@ The browser selects the video locally. TikTok authorization is handled server-si
 Never put `TIKTOK_CLIENT_SECRET` in `index.html` or client-side JavaScript. Do not commit real `.env` files or secrets to GitHub.
 
 ## Review / audit
-Unaudited Direct Post clients are restricted by TikTok (including private-only posting and user caps). Follow TikTok's current developer and product-use guidelines before submitting for review.
+Unaudited Direct Post clients are restricted by TikTok (including private-only posting and user caps). Follow TikTok's current developer and product-use guidelines before submitting for review. 
