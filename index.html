@@ -28,7 +28,7 @@
 <button class="tiktok" id="post" disabled>Post to TikTok</button>
 </div>
 
-<div id="account" class="account" style="display:none"><div><strong id="username">TikTok</strong><small>Connected for Direct Post</small></div><button class="secondary" id="refreshCreator">Refresh</button></div>
+<div id="account" class="account" style="display:none"><div><strong id="username">TikTok</strong><small>Connected for Direct Post</small></div><div class="actions" style="margin:0"><button class="secondary" id="refreshCreator">Refresh</button><button class="secondary" id="disconnect">Disconnect</button></div></div>
 
 <div id="postPanel" class="panel">
 <h2>Post to TikTok</h2>
@@ -42,6 +42,7 @@
 <label><input id="duet" type="checkbox"> Allow Duet</label>
 <label><input id="stitch" type="checkbox"> Allow Stitch</label>
 </div>
+<label class="consent"><input id="consent" type="checkbox"> I understand that this sends the selected video to TikTok for posting to my connected account.</label>
 <div class="actions"><button class="tiktok" id="sendTikTok" disabled>Send video to TikTok</button></div>
 <div class="bar" id="progress"><span id="progressBar"></span></div>
 </div>
@@ -54,24 +55,99 @@
 
 <script>
 let selected=null,url=null,creator=null,publishId=null;
-const file=document.getElementById('file'),drop=document.getElementById('drop');
-const statusEl=document.getElementById('status');
+const MAX_TIKTOK_SIZE=4*1024*1024*1024;
+const file=document.getElementById('file'),drop=document.getElementById('drop'),statusEl=document.getElementById('status');
 function formatSize(n){if(n<1024*1024)return(n/1024).toFixed(1)+' KB';return(n/1024/1024).toFixed(2)+' MB'}
 function status(msg,type=''){statusEl.textContent=msg;statusEl.className=type}
-function load(f){if(!f||!f.type.startsWith('video/')){status('Please choose a video file.','error');return}selected=f;document.getElementById('filename').textContent=f.name;document.getElementById('size').textContent=formatSize(f.size);document.getElementById('type').textContent=f.type||'video';document.getElementById('filebox').style.display='block';document.getElementById('download').disabled=false;document.getElementById('post').disabled=!creator;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);const v=document.getElementById('preview');v.src=url;v.style.display='block';status('Ready. This site will not compress or convert your file.');}
-file.addEventListener('change',e=>load(e.target.files[0]));['dragenter','dragover'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor='#aaa'}));['dragleave','drop'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor=''}));drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+function updatePostButton(){document.getElementById('post').disabled=!selected||!creator;document.getElementById('sendTikTok').disabled=!selected||!creator||!document.getElementById('consent').checked}
+function load(f){
+  if(!f||!['video/mp4','video/quicktime','video/webm'].includes(f.type)){status('Please choose an MP4, MOV, or WebM video.','error');return}
+  if(f.size>MAX_TIKTOK_SIZE){status('This video is larger than TikTok’s 4 GB limit.','error');return}
+  selected=f;
+  document.getElementById('filename').textContent=f.name;
+  document.getElementById('size').textContent=formatSize(f.size);
+  document.getElementById('type').textContent=f.type||'video';
+  document.getElementById('filebox').style.display='block';
+  document.getElementById('download').disabled=false;
+  updatePostButton();
+  if(url)URL.revokeObjectURL(url);
+  url=URL.createObjectURL(f);
+  const v=document.getElementById('preview');v.src=url;v.style.display='block';
+  status('Ready. This site will not compress or convert your file.');
+}
+file.addEventListener('change',e=>load(e.target.files[0]));
+['dragenter','dragover'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor='#aaa'}));
+['dragleave','drop'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.style.borderColor=''}));
+drop.addEventListener('drop',e=>load(e.dataTransfer.files[0]));
 
 document.getElementById('download').onclick=()=>{if(!selected)return;const a=document.createElement('a');a.href=URL.createObjectURL(selected);a.download=selected.name;document.body.appendChild(a);a.click();a.remove();status('Saved the original file — no conversion was performed.','success')};
-document.getElementById('clear').onclick=()=>{selected=null;file.value='';if(url)URL.revokeObjectURL(url);url=null;document.getElementById('filebox').style.display='none';document.getElementById('preview').style.display='none';document.getElementById('preview').removeAttribute('src');document.getElementById('download').disabled=true;document.getElementById('post').disabled=true;document.getElementById('postPanel').style.display='none';status('')};
-
+document.getElementById('clear').onclick=()=>{selected=null;file.value='';if(url)URL.revokeObjectURL(url);url=null;document.getElementById('filebox').style.display='none';document.getElementById('preview').style.display='none';document.getElementById('preview').removeAttribute('src');document.getElementById('download').disabled=true;document.getElementById('postPanel').style.display='none';document.getElementById('consent').checked=false;updatePostButton();status('')};
 document.getElementById('connect').onclick=()=>{window.location.href='/api/tiktok/auth'};
-async function getCreator(){status('Connecting to TikTok…');const r=await fetch('/api/tiktok/creator');if(!r.ok){creator=null;document.getElementById('account').style.display='none';document.getElementById('post').disabled=true;return false}creator=await r.json();const privacy=document.getElementById('privacy');privacy.innerHTML='';(creator.privacy_level_options||[]).forEach((x,i)=>{const o=document.createElement('option');o.value=x;o.textContent=x.replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());privacy.appendChild(o);if(i===0)o.selected=true});document.getElementById('username').textContent='@'+(creator.creator_username||creator.creator_nickname||'TikTok creator');document.getElementById('account').style.display='flex';document.getElementById('postPanel').style.display='block';document.getElementById('post').disabled=!selected;document.getElementById('sendTikTok').disabled=!selected;document.getElementById('comment').checked=!creator.comment_disabled;document.getElementById('duet').checked=!creator.duet_disabled;document.getElementById('stitch').checked=!creator.stitch_disabled;status('TikTok connected. Creator settings loaded.','success');return true}
+document.getElementById('disconnect').onclick=()=>{window.location.href='/api/tiktok/logout'};
+document.getElementById('consent').onchange=updatePostButton;
 
-document.getElementById('refreshCreator').onclick=getCreator;
-async function initTikTok(){const params=new URLSearchParams(location.search);if(params.get('tiktok')==='connected'){history.replaceState({},'',location.pathname);await getCreator()}if(params.get('tiktok_error')){status('TikTok authorization failed: '+params.get('tiktok_error'),'error');history.replaceState({},'',location.pathname)}else{try{await getCreator()}catch(e){}}}
+function prettyPrivacy(x){return x.replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}
+async function getCreator(){
+  const r=await fetch('/api/tiktok/creator',{cache:'no-store'});
+  if(!r.ok){creator=null;document.getElementById('account').style.display='none';document.getElementById('postPanel').style.display='none';updatePostButton();return false}
+  creator=await r.json();
+  const privacy=document.getElementById('privacy');privacy.innerHTML='';
+  (creator.privacy_level_options||[]).forEach((x,i)=>{const o=document.createElement('option');o.value=x;o.textContent=prettyPrivacy(x);privacy.appendChild(o);if(i===0)o.selected=true});
+  document.getElementById('username').textContent='@'+(creator.creator_username||creator.creator_nickname||'TikTok creator');
+  document.getElementById('account').style.display='flex';document.getElementById('postPanel').style.display='block';
+  document.getElementById('comment').checked=!creator.comment_disabled;
+  document.getElementById('duet').checked=!creator.duet_disabled;
+  document.getElementById('stitch').checked=!creator.stitch_disabled;
+  updatePostButton();
+  status('TikTok connected. Creator settings loaded.','success');
+  return true;
+}
+document.getElementById('refreshCreator').onclick=async()=>{status('Refreshing TikTok creator settings…');try{await getCreator()}catch(e){status('Could not refresh TikTok connection.','error')}};
 
-async function uploadToTikTok(){if(!selected||!creator)return;const btn=document.getElementById('sendTikTok'),bar=document.getElementById('progress'),barFill=document.getElementById('progressBar');btn.disabled=true;bar.style.display='block';barFill.style.width='0%';status('Preparing your TikTok post…');try{const init=await fetch('/api/tiktok/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.getElementById('caption').value,privacy_level:document.getElementById('privacy').value,disable_comment:!document.getElementById('comment').checked,disable_duet:!document.getElementById('duet').checked,disable_stitch:!document.getElementById('stitch').checked,video_size:selected.size})});const data=await init.json();if(!init.ok||!data.upload_url)throw new Error(data.error?.message||data.message||data.error||'TikTok could not initialize the post.');publishId=data.publish_id;const chunkSize=Math.min(10*1024*1024,selected.size);let offset=0;while(offset<selected.size){const end=Math.min(offset+chunkSize,selected.size);const chunk=selected.slice(offset,end);const r=await fetch(data.upload_url,{method:'PUT',headers:{'Content-Type':selected.type||'video/mp4','Content-Range':`bytes ${offset}-${end-1}/${selected.size}`},body:chunk});if(!r.ok)throw new Error('TikTok rejected a video upload chunk ('+r.status+').');offset=end;barFill.style.width=Math.round(offset/selected.size*100)+'%';status('Uploading to TikTok… '+Math.round(offset/selected.size*100)+'%')}
-status('Video uploaded. Waiting for TikTok to process it…');for(let i=0;i<10;i++){await new Promise(r=>setTimeout(r,2000));const r=await fetch('/api/tiktok/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({publish_id:publishId})});const d=await r.json();if(d.data?.status==='PUBLISH_COMPLETE'){status('Posted to TikTok successfully.','success');return}if(d.data?.status==='FAILED')throw new Error(d.data?.fail_reason||'TikTok could not publish the video.')}status('TikTok is still processing the video. You can check your TikTok account shortly.','success')}catch(e){console.error(e);status(e.message||'TikTok posting failed.','error')}finally{btn.disabled=!selected}}
+async function initTikTok(){
+  const params=new URLSearchParams(location.search);
+  if(params.get('tiktok')==='connected'){history.replaceState({},'',location.pathname);try{await getCreator()}catch(e){status('TikTok connection completed, but creator settings could not be loaded.','error')}}
+  else if(params.get('tiktok_error')){status('TikTok authorization failed: '+params.get('tiktok_error'),'error');history.replaceState({},'',location.pathname)}
+  else{try{await getCreator()}catch(e){}}
+}
+
+async function uploadToTikTok(){
+  if(!selected||!creator||!document.getElementById('consent').checked)return;
+  const btn=document.getElementById('sendTikTok'),bar=document.getElementById('progress'),barFill=document.getElementById('progressBar');
+  btn.disabled=true;bar.style.display='block';barFill.style.width='0%';status('Preparing your TikTok post…');
+  try{
+    const init=await fetch('/api/tiktok/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.getElementById('caption').value,privacy_level:document.getElementById('privacy').value,disable_comment:!document.getElementById('comment').checked,disable_duet:!document.getElementById('duet').checked,disable_stitch:!document.getElementById('stitch').checked,video_size:selected.size})});
+    const data=await init.json();
+    if(!init.ok||!data.upload_url)throw new Error(data.error?.message||data.message||data.error||'TikTok could not initialize the post.');
+    publishId=data.publish_id;
+    // TikTok requires chunks to be sequential. For files <=64 MB, send one whole chunk.
+    const chunkSize=selected.size<=64*1024*1024?selected.size:10*1024*1024;
+    let offset=0;
+    while(offset<selected.size){
+      let end=Math.min(offset+chunkSize,selected.size);
+      // If the trailing chunk would be below 5 MB, merge it into the previous chunk.
+      const remainder=selected.size-end;
+      if(remainder>0 && remainder<5*1024*1024)end=selected.size;
+      const chunk=selected.slice(offset,end);
+      const r=await fetch(data.upload_url,{method:'PUT',headers:{'Content-Type':selected.type||'video/mp4','Content-Range':`bytes ${offset}-${end-1}/${selected.size}`},body:chunk});
+      if(!r.ok)throw new Error('TikTok rejected a video upload chunk ('+r.status+').');
+      offset=end;barFill.style.width=Math.round(offset/selected.size*100)+'%';status('Uploading to TikTok… '+Math.round(offset/selected.size*100)+'%');
+    }
+    status('Video uploaded. Waiting for TikTok to finish processing…');
+    for(let i=0;i<12;i++){
+      await new Promise(r=>setTimeout(r,10000));
+      const r=await fetch('/api/tiktok/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({publish_id:publishId})});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error?.message||d.message||'Could not check TikTok post status.');
+      const state=d.data?.status;
+      if(state==='PUBLISH_COMPLETE'){status('Posted to TikTok successfully.','success');return}
+      if(state==='FAILED')throw new Error(d.data?.fail_reason||'TikTok could not publish the video.');
+      status('TikTok is processing your video…');
+    }
+    status('TikTok is still processing the video. Check your TikTok account shortly.','success');
+  }catch(e){console.error(e);status(e.message||'TikTok posting failed.','error')}
+  finally{updatePostButton()}
+}
 document.getElementById('sendTikTok').onclick=uploadToTikTok;
 initTikTok();
 </script>
