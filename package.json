@@ -1,0 +1,8 @@
+{
+  "name": "riel-quality-transfer",
+  "version": "2.0.0",
+  "private": true,
+  "description": "RIEL Quality Transfer with TikTok Content Posting API Direct Post integration",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "vercel dev" }
+}
